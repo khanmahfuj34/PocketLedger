@@ -81,24 +81,18 @@ class ReportService
         CarbonInterface $endDate,
         string $groupBy
     ): array {
+        $categoryData = $this->getCategoryAndSummaryData(
+            $user,
+            $startDate,
+            $endDate
+        );
+
         return [
-            'summary' => $this->getSummary(
-                $user,
-                $startDate,
-                $endDate
-            ),
+            'summary' => $categoryData['summary'],
 
-            'expenseByCategory' => $this->getExpenseByCategory(
-                $user,
-                $startDate,
-                $endDate
-            ),
+            'expenseByCategory' => $categoryData['expenseByCategory'],
 
-            'incomeByCategory' => $this->getIncomeByCategory(
-                $user,
-                $startDate,
-                $endDate
-            ),
+            'incomeByCategory' => $categoryData['incomeByCategory'],
 
             'trend' => $this->getTrend(
                 $user,
@@ -121,9 +115,9 @@ class ReportService
     }
 
     /**
-     * Total income, expense and savings.
+     * Consolidated category breakdown and summary in a single query.
      */
-    private function getSummary(
+    public function getCategoryAndSummaryData(
         User $user,
         CarbonInterface $startDate,
         CarbonInterface $endDate
@@ -131,89 +125,7 @@ class ReportService
         $startStr = $startDate->toDateString();
         $endStr = $endDate->format('Y-m-d 23:59:59');
 
-        $totals = Transaction::query()
-            ->join(
-                'categories',
-                'transactions.category_id',
-                '=',
-                'categories.id'
-            )
-            ->where('transactions.user_id', $user->id)
-            ->where('transactions.transaction_date', '>=', $startStr)
-            ->where('transactions.transaction_date', '<=', $endStr)
-            ->selectRaw("
-                SUM(
-                    CASE WHEN categories.type = 'income'
-                    THEN transactions.amount ELSE 0 END
-                ) as total_income
-            ")
-            ->selectRaw("
-                SUM(
-                    CASE WHEN categories.type = 'expense'
-                    THEN transactions.amount ELSE 0 END
-                ) as total_expense
-            ")
-            ->first();
-
-        $income = (float) ($totals->total_income ?? 0);
-        $expense = (float) ($totals->total_expense ?? 0);
-        $savings = $income - $expense;
-
-        return [
-            'totalIncome' => round($income, 2),
-            'totalExpense' => round($expense, 2),
-            'netSavings' => round($savings, 2),
-            'savingsRate' => $income > 0
-                ? round(($savings / $income) * 100, 2)
-                : 0.0,
-        ];
-    }
-
-    /**
-     * Expense grouped by category.
-     */
-    private function getExpenseByCategory(
-        User $user,
-        CarbonInterface $startDate,
-        CarbonInterface $endDate
-    ): Collection {
-        return $this->getCategoryBreakdown(
-            $user,
-            $startDate,
-            $endDate,
-            'expense'
-        );
-    }
-
-    /**
-     * Income grouped by category.
-     */
-    private function getIncomeByCategory(
-        User $user,
-        CarbonInterface $startDate,
-        CarbonInterface $endDate
-    ): Collection {
-        return $this->getCategoryBreakdown(
-            $user,
-            $startDate,
-            $endDate,
-            'income'
-        );
-    }
-
-    /**
-     * Shared category breakdown query with percentage share.
-     */
-    private function getCategoryBreakdown(
-        User $user,
-        CarbonInterface $startDate,
-        CarbonInterface $endDate,
-        string $type
-    ): Collection {
-        $startStr = $startDate->toDateString();
-        $endStr = $endDate->format('Y-m-d 23:59:59');
-
-        $items = Transaction::query()
+        $rows = Transaction::query()
             ->join(
                 'categories',
                 'transactions.category_id',
@@ -222,18 +134,19 @@ class ReportService
             )
             ->where('transactions.user_id', $user->id)
             ->where('categories.user_id', $user->id)
-            ->where('categories.type', $type)
             ->where('transactions.transaction_date', '>=', $startStr)
             ->where('transactions.transaction_date', '<=', $endStr)
             ->groupBy(
                 'categories.id',
                 'categories.name',
+                'categories.type',
                 'categories.color',
                 'categories.icon'
             )
             ->selectRaw('
                 categories.id as category_id,
                 categories.name as category_name,
+                categories.type as category_type,
                 categories.color,
                 categories.icon,
                 SUM(transactions.amount) as total
@@ -241,16 +154,78 @@ class ReportService
             ->orderByDesc('total')
             ->get();
 
-        $grandTotal = (float) $items->sum('total');
+        $expenseRows = $rows->where('category_type', 'expense')->values();
+        $incomeRows = $rows->where('category_type', 'income')->values();
 
-        return $items->map(function ($item) use ($grandTotal) {
+        $totalExpense = (float) $expenseRows->sum('total');
+        $totalIncome = (float) $incomeRows->sum('total');
+        $netSavings = $totalIncome - $totalExpense;
+
+        $expenseByCategory = $expenseRows->map(function ($item) use ($totalExpense) {
             $amount = (float) $item->total;
             $item->total = round($amount, 2);
-            $item->percentage = $grandTotal > 0
-                ? round(($amount / $grandTotal) * 100, 2)
+            $item->percentage = $totalExpense > 0
+                ? round(($amount / $totalExpense) * 100, 2)
                 : 0.0;
             return $item;
         });
+
+        $incomeByCategory = $incomeRows->map(function ($item) use ($totalIncome) {
+            $amount = (float) $item->total;
+            $item->total = round($amount, 2);
+            $item->percentage = $totalIncome > 0
+                ? round(($amount / $totalIncome) * 100, 2)
+                : 0.0;
+            return $item;
+        });
+
+        $summary = [
+            'totalIncome' => round($totalIncome, 2),
+            'totalExpense' => round($totalExpense, 2),
+            'netSavings' => round($netSavings, 2),
+            'savingsRate' => $totalIncome > 0
+                ? round(($netSavings / $totalIncome) * 100, 2)
+                : 0.0,
+        ];
+
+        return [
+            'summary' => $summary,
+            'expenseByCategory' => $expenseByCategory,
+            'incomeByCategory' => $incomeByCategory,
+        ];
+    }
+
+    /**
+     * Total income, expense and savings.
+     */
+    public function getSummary(
+        User $user,
+        CarbonInterface $startDate,
+        CarbonInterface $endDate
+    ): array {
+        return $this->getCategoryAndSummaryData($user, $startDate, $endDate)['summary'];
+    }
+
+    /**
+     * Expense grouped by category.
+     */
+    public function getExpenseByCategory(
+        User $user,
+        CarbonInterface $startDate,
+        CarbonInterface $endDate
+    ): Collection {
+        return $this->getCategoryAndSummaryData($user, $startDate, $endDate)['expenseByCategory'];
+    }
+
+    /**
+     * Income grouped by category.
+     */
+    public function getIncomeByCategory(
+        User $user,
+        CarbonInterface $startDate,
+        CarbonInterface $endDate
+    ): Collection {
+        return $this->getCategoryAndSummaryData($user, $startDate, $endDate)['incomeByCategory'];
     }
 
     /**
