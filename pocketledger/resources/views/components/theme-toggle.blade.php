@@ -31,6 +31,8 @@
         const html = document.documentElement;
         const isDark = html.classList.toggle('dark');
         localStorage.theme = isDark ? 'dark' : 'light';
+        html.style.backgroundColor = isDark ? '#020617' : '#f8fafc';
+        html.style.colorScheme = isDark ? 'dark' : 'light';
 
         // Notify charts if any
         window.dispatchEvent(new CustomEvent('themeChanged', { detail: { isDark } }));

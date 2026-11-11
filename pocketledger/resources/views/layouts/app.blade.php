@@ -11,6 +11,8 @@
         <nav>
             <a href="/dashboard">Dashboard</a>
             <a href="/transactions">Transactions</a>
+            <a href="{{ route('budgets.index') }}">Budgets</a>
+            <a href="{{ route('reports.index') }}">Reports</a>
             <a href="/settings">Settings</a>
 
             @auth

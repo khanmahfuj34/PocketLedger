@@ -68,43 +68,227 @@
         </a>
     </div>
 
-    <!-- 4. Reports Tab -->
+    <!-- 4. Budgets Tab -->
     <a
-        href="{{ route('dashboard') }}#analytics"
-        class="flex flex-col items-center justify-center flex-1 py-1 ios-press group text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium"
+        href="{{ route('budgets.index') }}"
+        class="flex flex-col items-center justify-center flex-1 py-1 ios-press group {{ $active === 'budgets' ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium' }}"
     >
         <div class="relative w-6 h-6 flex items-center justify-center">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10"></line>
-                <line x1="12" y1="20" x2="12" y2="4"></line>
-                <line x1="6" y1="20" x2="6" y2="14"></line>
-            </svg>
+            @if($active === 'budgets')
+                <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+                    <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+                </svg>
+                <span class="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-500"></span>
+            @else
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+                    <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+                </svg>
+            @endif
+        </div>
+        <span class="text-[10px] tracking-tight mt-0.5">Budgets</span>
+    </a>
+
+    <!-- 5. Reports Tab -->
+    <a
+        href="{{ Route::has('reports.index') ? route('reports.index') : (Route::has('reports') ? route('reports') : route('dashboard') . '#analytics') }}"
+        class="flex flex-col items-center justify-center flex-1 py-1 ios-press group {{ $active === 'reports' ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium' }}"
+    >
+        <div class="relative w-6 h-6 flex items-center justify-center">
+            @if($active === 'reports')
+                <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <span class="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-500"></span>
+            @else
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+            @endif
         </div>
         <span class="text-[10px] tracking-tight mt-0.5">Reports</span>
     </a>
-
-    <!-- 5. Theme / Profile Tab -->
-    <button
-        type="button"
-        onclick="toggleAppTheme()"
-        class="flex flex-col items-center justify-center flex-1 py-1 ios-press group text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium"
-    >
-        <div class="relative w-6 h-6 flex items-center justify-center">
-            <!-- Dynamic Sun / Moon -->
-            <svg class="hidden dark:block w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-            </svg>
-            <svg class="block dark:hidden w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
-        </div>
-        <span class="text-[10px] tracking-tight mt-0.5">Theme</span>
-    </button>
 </nav>
+
+<!-- Smooth Mobile Bottom Navigation Transition Script (Zero-Dependency) -->
+<script data-persistent="true">
+(function() {
+    if (window._pocketLedgerNavActive) return;
+    window._pocketLedgerNavActive = true;
+
+    var navCache = new Map();
+    var currentAbort = null;
+
+    // Prefetch URL on pointerdown (touch/hover)
+    function prefetchUrl(url) {
+        if (!url) return;
+        var clean = url.split('#')[0];
+        if (navCache.has(clean)) return;
+
+        fetch(clean, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            priority: 'low'
+        })
+        .then(function(res) { return res.ok ? res.text() : null; })
+        .then(function(html) {
+            if (html) {
+                navCache.set(clean, { html: html, time: Date.now() });
+            }
+        })
+        .catch(function() {});
+    }
+
+    // Prefetch on touchstart / pointerdown
+    document.addEventListener('pointerdown', function(e) {
+        var a = e.target.closest('nav.lg\\:hidden a[href]');
+        if (a && a.href && a.origin === window.location.origin) {
+            prefetchUrl(a.href);
+        }
+    }, { passive: true });
+
+    // Smooth navigation handler
+    async function switchMobileTab(url, pushState) {
+        var cleanUrl = url.split('#')[0];
+        var hash = url.includes('#') ? url.substring(url.indexOf('#')) : '';
+        var currentClean = window.location.href.split('#')[0];
+
+        // Same page: smooth scroll to top or hash
+        if (cleanUrl === currentClean) {
+            if (hash) {
+                var el = document.querySelector(hash);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            return;
+        }
+
+        if (currentAbort) {
+            currentAbort.abort();
+        }
+        currentAbort = new AbortController();
+
+        try {
+            var html = null;
+            var cached = navCache.get(cleanUrl);
+            var now = Date.now();
+
+            if (cached && (now - cached.time < 30000)) {
+                html = cached.html;
+            } else {
+                var response = await fetch(cleanUrl, {
+                    signal: currentAbort.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!response.ok) {
+                    window.location.href = url;
+                    return;
+                }
+
+                html = await response.text();
+                navCache.set(cleanUrl, { html: html, time: now });
+            }
+
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+
+            function applyUpdate() {
+                // 1. Update Title
+                if (doc.title) {
+                    document.title = doc.title;
+                }
+
+                // 2. Replace Main Layout Container
+                var oldMain = document.querySelector('.min-h-screen.flex.flex-col.lg\\:flex-row');
+                var newMain = doc.querySelector('.min-h-screen.flex.flex-col.lg\\:flex-row');
+                if (oldMain && newMain) {
+                    oldMain.replaceWith(newMain);
+                }
+
+                // 3. Replace Bottom Navigation Bar (Updates active tab styling)
+                var oldNav = document.querySelector('nav.lg\\:hidden');
+                var newNav = doc.querySelector('nav.lg\\:hidden');
+                if (oldNav && newNav) {
+                    oldNav.replaceWith(newNav);
+                }
+
+                // 4. Update History
+                if (pushState) {
+                    window.history.pushState({ url: url }, '', url);
+                }
+
+                // 5. Scroll to top
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
+                // 6. Execute scripts from the new page's body
+                doc.querySelectorAll('body script').forEach(function(s) {
+                    if (s.dataset.persistent || s.textContent.includes('_pocketLedgerNavActive')) {
+                        return;
+                    }
+                    var freshScript = document.createElement('script');
+                    Array.from(s.attributes).forEach(function(attr) {
+                        freshScript.setAttribute(attr.name, attr.value);
+                    });
+                    freshScript.textContent = s.textContent;
+                    document.body.appendChild(freshScript);
+                });
+
+                // Dispatch synthetic event for any listening components
+                window.dispatchEvent(new CustomEvent('pocketledger:navigated', { detail: { url: url } }));
+            }
+
+            if (document.startViewTransition) {
+                document.startViewTransition(function() {
+                    applyUpdate();
+                });
+            } else {
+                applyUpdate();
+            }
+
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            window.location.href = url;
+        } finally {
+            currentAbort = null;
+        }
+    }
+
+    // Intercept clicks on bottom navigation
+    document.addEventListener('click', function(e) {
+        var a = e.target.closest('nav.lg\\:hidden a[href]');
+        if (!a) return;
+
+        // Ignore modified or non-left clicks
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (a.target === '_blank' || a.hasAttribute('download')) return;
+
+        var href = a.href;
+        if (!href || !href.startsWith('http')) return;
+
+        var url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+
+        e.preventDefault();
+        switchMobileTab(href, true);
+    });
+
+    // Browser Back / Forward handler
+    window.addEventListener('popstate', function() {
+        switchMobileTab(window.location.href, false);
+    });
+
+    // Invalidate cache on mutations (form submit)
+    document.addEventListener('submit', function() {
+        navCache.clear();
+    });
+})();
+</script>
 

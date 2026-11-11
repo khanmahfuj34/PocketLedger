@@ -51,8 +51,18 @@
                     <span>Transactions</span>
                 </a>
 
+                <!-- Budgets -->
+                <a href="{{ route('budgets.index') }}" class="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <svg class="w-5 h-5 text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+                        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+                        <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+                    </svg>
+                    <span>Budgets</span>
+                </a>
+
                 <!-- Reports -->
-                <a href="{{ route('dashboard') }}#analytics" class="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <a href="{{ route('reports.index') }}" class="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <svg class="w-5 h-5 text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="20" x2="18" y2="10"></line>
                         <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -144,7 +154,9 @@
 
                     <!-- Right Quick Actions -->
                     <div class="flex items-center gap-2 sm:gap-3">
-                        <x-theme-toggle />
+                        <div class="hidden lg:block">
+                            <x-theme-toggle />
+                        </div>
 
                         <a href="{{ route('transactions.create') }}" class="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm shadow-sm shadow-emerald-500/20 transition-all ios-press">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -154,10 +166,8 @@
                             <span>Add Transaction</span>
                         </a>
 
-                        <!-- Profile Avatar (Mobile) -->
-                        <div class="lg:hidden w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 font-bold flex items-center justify-center text-xs border border-violet-200 dark:border-violet-900 shadow-xs">
-                            {{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}
-                        </div>
+                        <!-- Profile Dropdown -->
+                        <x-profile-dropdown />
                     </div>
                 </div>
             </header>
@@ -554,9 +564,9 @@
     <x-bottom-nav active="transactions" />
 
     <script>
-        let currentTypeFilter = 'all';
+        var currentTypeFilter = 'all';
 
-        function setTypeFilter(type) {
+        window.setTypeFilter = function(type) {
             currentTypeFilter = type;
             const btnAll = document.getElementById('btnFilterAll');
             const btnExp = document.getElementById('btnFilterExpense');
@@ -565,14 +575,14 @@
             const inactiveCls = "px-3.5 py-1.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all ios-press";
             const activeCls = "px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400 shadow-xs transition-all ios-press";
 
-            btnAll.className = type === 'all' ? activeCls : inactiveCls;
-            btnExp.className = type === 'expense' ? activeCls : inactiveCls;
-            btnInc.className = type === 'income' ? activeCls : inactiveCls;
+            if (btnAll) btnAll.className = type === 'all' ? activeCls : inactiveCls;
+            if (btnExp) btnExp.className = type === 'expense' ? activeCls : inactiveCls;
+            if (btnInc) btnInc.className = type === 'income' ? activeCls : inactiveCls;
 
             filterClientTransactions();
-        }
+        };
 
-        function filterClientTransactions() {
+        window.filterClientTransactions = function() {
             const query = (document.getElementById('transactionSearch')?.value || '').toLowerCase().trim();
             const date = document.getElementById('dateFilter')?.value || '';
             const payment = (document.getElementById('paymentFilter')?.value || '').toLowerCase();
@@ -603,7 +613,7 @@
             if (countEl) {
                 countEl.textContent = `Showing ${visibleCount} visible records`;
             }
-        }
+        };
     </script>
 
 </body>

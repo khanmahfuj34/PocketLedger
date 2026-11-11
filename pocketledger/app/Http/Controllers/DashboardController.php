@@ -3,56 +3,117 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         /** @var User $user */
         $user = Auth::user();
         $userId = $user->id;
 
-        // 1. Total Income (All-Time, non-deleted, only income categories)
-        $income = (float) (DB::table('transactions')
+        // 1. Resolve Application Timezone and Current / Account Boundaries
+        $tz = config('app.timezone', 'Asia/Dhaka');
+        $nowInTz = Carbon::now($tz);
+        $currentDate = $nowInTz->copy()->startOfMonth();
+        $currentMonthKey = $currentDate->format('Y-m');
+
+        // Account creation boundary (start of month user registered)
+        $userCreatedAt = $user->created_at
+            ? $user->created_at->copy()->setTimezone($tz)->startOfMonth()
+            : $currentDate->copy();
+
+        // Guard against clock skew where created_at is in the future
+        if ($userCreatedAt->greaterThan($currentDate)) {
+            $userCreatedAt = $currentDate->copy();
+        }
+
+        // Dynamically build available months descending: Current Month down to Registration Month
+        $availableMonths = [];
+        $cursor = $currentDate->copy();
+        while ($cursor->greaterThanOrEqualTo($userCreatedAt)) {
+            $availableMonths[] = [
+                'key' => $cursor->format('Y-m'),
+                'label' => $cursor->format('F Y'),
+                'short_label' => $cursor->format('M Y'),
+                'year' => $cursor->year,
+                'month' => $cursor->month,
+                'is_current' => ($cursor->format('Y-m') === $currentMonthKey),
+            ];
+            $cursor->subMonth();
+        }
+
+        // 2. Validate Selected Month Parameter (must be valid format, not in future, not before created_at)
+        $monthInput = $request->query('month');
+        if (!is_string($monthInput) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $monthInput)) {
+            $selectedDate = $currentDate->copy();
+        } else {
+            try {
+                $parsedDate = Carbon::createFromFormat('!Y-m', $monthInput, $tz)->startOfMonth();
+                if ($parsedDate->greaterThan($currentDate) || $parsedDate->lessThan($userCreatedAt)) {
+                    $selectedDate = $currentDate->copy();
+                } else {
+                    $selectedDate = $parsedDate;
+                }
+            } catch (\Throwable $e) {
+                $selectedDate = $currentDate->copy();
+            }
+        }
+
+        $selectedMonth = $selectedDate->format('Y-m');
+        $startDate = $selectedDate->copy()->startOfMonth()->toDateString();
+        $endDate = $selectedDate->copy()->endOfMonth()->toDateString();
+        $endDateTime = $selectedDate->copy()->endOfMonth()->format('Y-m-d 23:59:59');
+        $prevMonth = $selectedDate->copy()->subMonth()->format('Y-m');
+        $nextMonth = $selectedDate->copy()->addMonth()->format('Y-m');
+        $isCurrentMonth = ($selectedMonth === $currentMonthKey);
+
+        // 2. Total Monthly Income (Selected Month, non-deleted)
+        $monthlyIncome = (float) (DB::table('transactions')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $userId)
             ->whereNull('transactions.deleted_at')
             ->where('categories.type', 'income')
+            ->where('transactions.transaction_date', '>=', $startDate)
+            ->where('transactions.transaction_date', '<=', $endDateTime)
             ->sum('transactions.amount') ?? 0);
 
-        // 2. Total Expense (All-Time, non-deleted, only expense categories)
-        $expense = (float) (DB::table('transactions')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('transactions.user_id', $userId)
-            ->whereNull('transactions.deleted_at')
-            ->where('categories.type', 'expense')
-            ->sum('transactions.amount') ?? 0);
-
-        // 3. Monthly Total Expense (Current Month and Current Year)
-        $currentYear = now()->year;
-        $currentMonth = now()->month;
-
+        // 3. Total Monthly Expense (Selected Month, non-deleted)
         $monthlyExpense = (float) (DB::table('transactions')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $userId)
             ->whereNull('transactions.deleted_at')
             ->where('categories.type', 'expense')
-            ->whereYear('transactions.transaction_date', $currentYear)
-            ->whereMonth('transactions.transaction_date', $currentMonth)
+            ->where('transactions.transaction_date', '>=', $startDate)
+            ->where('transactions.transaction_date', '<=', $endDateTime)
             ->sum('transactions.amount') ?? 0);
 
-        // 4. Monthly Expense Trend (Past 6 months ending with current month)
+        // 4. Net Monthly Savings
+        $netSavings = $monthlyIncome - $monthlyExpense;
+        $savingsRate = $monthlyIncome > 0 ? round(($netSavings / $monthlyIncome) * 100, 1) : 0;
+
+        // 5. Monthly Budget Overview for the Selected Month
+        $budgetMonthDate = $selectedDate->format('Y-m-01');
+        $monthlyBudget = (float) ($user->budgets()
+            ->where('budget_month', $budgetMonthDate)
+            ->sum('amount') ?? 0);
+        $budgetRemaining = $monthlyBudget > 0 ? ($monthlyBudget - $monthlyExpense) : 0;
+        $budgetProgress = $monthlyBudget > 0 ? min(100, round(($monthlyExpense / $monthlyBudget) * 100)) : 0;
+
+        // 6. Monthly Expense Trend (6-month rolling window ending with the selected month)
         $trendData = [];
         $maxTrendAmount = 0.0;
 
         for ($i = 5; $i >= 0; $i--) {
-            $monthDate = now()->subMonths($i);
+            $monthDate = $selectedDate->copy()->subMonths($i);
             $year = $monthDate->year;
             $month = $monthDate->month;
             $monthName = $monthDate->format('M');
-            $isCurrent = ($i === 0);
+            $isTargetMonth = ($i === 0);
 
             $spent = (float) (DB::table('transactions')
                 ->join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -70,7 +131,8 @@ class DashboardController extends Controller
             $trendData[] = [
                 'label' => $monthName,
                 'amount' => $spent,
-                'is_current' => $isCurrent,
+                'is_current' => $isTargetMonth,
+                'month_key' => $monthDate->format('Y-m'),
             ];
         }
 
@@ -86,7 +148,7 @@ class DashboardController extends Controller
 
         $trendScale = $this->generateTrendScale($maxTrendAmount);
 
-        // 5. Expense by Category (Grouped by user's categories)
+        // 7. Expense by Category (Scoped strictly to the selected month)
         $palette = ['#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#64748B'];
 
         $categoryExpenses = DB::table('transactions')
@@ -94,6 +156,8 @@ class DashboardController extends Controller
             ->where('transactions.user_id', $userId)
             ->whereNull('transactions.deleted_at')
             ->where('categories.type', 'expense')
+            ->where('transactions.transaction_date', '>=', $startDate)
+            ->where('transactions.transaction_date', '<=', $endDateTime)
             ->select(
                 'categories.id',
                 'categories.name',
@@ -131,25 +195,60 @@ class DashboardController extends Controller
             ];
         }
 
-        // 6. Recent Transactions (User's latest 5 transactions)
+        // 8. Recent Transactions (Scoped to the selected month, latest 5)
         $recentTransactions = $user->transactions()
             ->with('category')
+            ->where('transaction_date', '>=', $startDate)
+            ->where('transaction_date', '<=', $endDateTime)
             ->latest('transaction_date')
             ->latest('id')
             ->take(5)
             ->get();
 
-        return view('dashboard', compact(
-            'income',
-            'expense',
-            'monthlyExpense',
-            'trendData',
-            'trendScale',
-            'maxTrendAmount',
-            'categoryData',
-            'categoryTotal',
-            'recentTransactions'
-        ));
+        // 9. All-Time totals (for background reference)
+        $allTimeIncome = (float) (DB::table('transactions')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', $userId)
+            ->whereNull('transactions.deleted_at')
+            ->where('categories.type', 'income')
+            ->sum('transactions.amount') ?? 0);
+
+        $allTimeExpense = (float) (DB::table('transactions')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', $userId)
+            ->whereNull('transactions.deleted_at')
+            ->where('categories.type', 'expense')
+            ->sum('transactions.amount') ?? 0);
+
+        return view('dashboard', [
+            'selectedDate' => $selectedDate,
+            'selectedMonth' => $selectedMonth,
+            'availableMonths' => $availableMonths,
+            'currentMonthKey' => $currentMonthKey,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'prevMonth' => $prevMonth,
+            'nextMonth' => $nextMonth,
+            'isCurrentMonth' => $isCurrentMonth,
+            'monthlyIncome' => $monthlyIncome,
+            'monthlyExpense' => $monthlyExpense,
+            'netSavings' => $netSavings,
+            'savingsRate' => $savingsRate,
+            'monthlyBudget' => $monthlyBudget,
+            'budgetRemaining' => $budgetRemaining,
+            'budgetProgress' => $budgetProgress,
+            'trendData' => $trendData,
+            'trendScale' => $trendScale,
+            'maxTrendAmount' => $maxTrendAmount,
+            'categoryData' => $categoryData,
+            'categoryTotal' => $categoryTotal,
+            'recentTransactions' => $recentTransactions,
+            'allTimeIncome' => $allTimeIncome,
+            'allTimeExpense' => $allTimeExpense,
+            // Backwards compatibility keys
+            'income' => $monthlyIncome,
+            'expense' => $monthlyExpense,
+        ]);
     }
 
     private function generateTrendScale(float $max): array

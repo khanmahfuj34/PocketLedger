@@ -3,10 +3,12 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
-
-
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 
 // Root Route: Redirects authenticated users to dashboard and guests to login
 Route::get('/', function () {
@@ -67,12 +69,25 @@ Route::middleware('auth')->group(function () {
         TransactionController::class,
         'destroy'
     ])->name('transactions.destroy');
-
     
+    Route::get('/reports', [ReportController::class, 'index'])
+        ->name('reports.index');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->name('dashboard');
-});
+    // Budget Management Routes
+    Route::resource('budgets', BudgetController::class)
+        ->except(['show']);
 
+    // Profile Routes
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])
+        ->name('profile.password');
+
+    // Settings Routes
+    Route::get('/settings', [SettingsController::class, 'index'])
+        ->name('settings.index');
+    Route::post('/settings/clear-data', [SettingsController::class, 'clearData'])
+        ->name('settings.clear-data');
 });

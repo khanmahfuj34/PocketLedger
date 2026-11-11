@@ -5,75 +5,69 @@
 <meta name="theme-color" content="#10B981" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#020617" media="(prefers-color-scheme: dark)">
 
-<!-- Google Fonts: Inter -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-<!-- Tailwind CSS CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- 1. Immediate Critical Anti-Flicker Script (Runs synchronously before any stylesheet/scripts) -->
 <script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-            extend: {
-                colors: {
-                    primary: {
-                        DEFAULT: '#10B981',
-                        50: '#ECFDF5',
-                        100: '#D1FAE5',
-                        200: '#A7F3D0',
-                        300: '#6EE7B7',
-                        400: '#34D399',
-                        500: '#10B981',
-                        600: '#059669',
-                        700: '#047857',
-                        800: '#065F46',
-                        900: '#064E3B',
-                    }
-                },
-                fontFamily: {
-                    sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-                },
-                boxShadow: {
-                    'ios': '0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
-                    'ios-lg': '0 10px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
-                }
+    (function() {
+        try {
+            var isDark = localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            var root = document.documentElement;
+            if (isDark) {
+                root.classList.add('dark');
+            } else {
+                root.classList.remove('dark');
             }
-        }
-    }
+            var bg = isDark ? '#020617' : '#f8fafc';
+            root.style.backgroundColor = bg;
+            root.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {}
+    })();
 </script>
 
-<!-- Immediate Anti-Flicker Theme Detection -->
-<script>
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-</script>
-
+<!-- 2. Critical Baseline Layout & Anti-Flash CSS (Immediate render tree baseline) -->
 <style>
-    /* iOS Safe Areas & Native Inertia Scrolling */
+    /* Critical Root Backgrounds: Prevents white flash before external Tailwind CDN renders */
     :root {
+        color-scheme: light dark;
         --sat: env(safe-area-inset-top, 0px);
         --sab: env(safe-area-inset-bottom, 0px);
         --sal: env(safe-area-inset-left, 0px);
         --sar: env(safe-area-inset-right, 0px);
     }
-    
+
     html {
+        background-color: #f8fafc;
+        color-scheme: light;
         scroll-behavior: smooth;
         -webkit-tap-highlight-color: transparent;
     }
 
+    html.dark {
+        background-color: #020617 !important;
+        color-scheme: dark;
+    }
+
     body {
+        background-color: #f8fafc;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         padding-left: var(--sal);
         padding-right: var(--sar);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         overflow-x: hidden;
+    }
+
+    html.dark body {
+        background-color: #020617 !important;
+    }
+
+    /* Cross-Document View Transitions: Smooth native cross-fading without flash */
+    @view-transition {
+        navigation: auto;
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation-duration: 0.15s;
     }
 
     /* Prevent iOS Safari input zoom by ensuring 16px font-size on mobile inputs */
@@ -109,3 +103,41 @@
     }
 </style>
 
+<!-- 3. Google Fonts: Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- 4. Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    primary: {
+                        DEFAULT: '#10B981',
+                        50: '#ECFDF5',
+                        100: '#D1FAE5',
+                        200: '#A7F3D0',
+                        300: '#6EE7B7',
+                        400: '#34D399',
+                        500: '#10B981',
+                        600: '#059669',
+                        700: '#047857',
+                        800: '#065F46',
+                        900: '#064E3B',
+                    }
+                },
+                fontFamily: {
+                    sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                },
+                boxShadow: {
+                    'ios': '0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
+                    'ios-lg': '0 10px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+                }
+            }
+        }
+    }
+</script>
