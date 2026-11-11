@@ -72,31 +72,29 @@ class DashboardController extends Controller
         $nextMonth = $selectedDate->copy()->addMonth()->format('Y-m');
         $isCurrentMonth = ($selectedMonth === $currentMonthKey);
 
-        // 2. Total Monthly Income (Selected Month, non-deleted)
-        $monthlyIncome = (float) (DB::table('transactions')
+        // 2. Consolidated Income & Expense Totals (Selected Month & All-Time in 1 single query)
+        $totals = DB::table('transactions')
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.user_id', $userId)
             ->whereNull('transactions.deleted_at')
-            ->where('categories.type', 'income')
-            ->where('transactions.transaction_date', '>=', $startDate)
-            ->where('transactions.transaction_date', '<=', $endDateTime)
-            ->sum('transactions.amount') ?? 0);
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN categories.type = 'income' AND transactions.transaction_date >= ? AND transactions.transaction_date <= ? THEN transactions.amount ELSE 0 END), 0) as monthly_income,
+                COALESCE(SUM(CASE WHEN categories.type = 'expense' AND transactions.transaction_date >= ? AND transactions.transaction_date <= ? THEN transactions.amount ELSE 0 END), 0) as monthly_expense,
+                COALESCE(SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END), 0) as all_time_income,
+                COALESCE(SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END), 0) as all_time_expense
+            ", [$startDate, $endDateTime, $startDate, $endDateTime])
+            ->first();
 
-        // 3. Total Monthly Expense (Selected Month, non-deleted)
-        $monthlyExpense = (float) (DB::table('transactions')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('transactions.user_id', $userId)
-            ->whereNull('transactions.deleted_at')
-            ->where('categories.type', 'expense')
-            ->where('transactions.transaction_date', '>=', $startDate)
-            ->where('transactions.transaction_date', '<=', $endDateTime)
-            ->sum('transactions.amount') ?? 0);
+        $monthlyIncome = (float) ($totals->monthly_income ?? 0);
+        $monthlyExpense = (float) ($totals->monthly_expense ?? 0);
+        $allTimeIncome = (float) ($totals->all_time_income ?? 0);
+        $allTimeExpense = (float) ($totals->all_time_expense ?? 0);
 
-        // 4. Net Monthly Savings
+        // 3. Net Monthly Savings
         $netSavings = $monthlyIncome - $monthlyExpense;
         $savingsRate = $monthlyIncome > 0 ? round(($netSavings / $monthlyIncome) * 100, 1) : 0;
 
-        // 5. Monthly Budget Overview for the Selected Month
+        // 4. Monthly Budget Overview for the Selected Month
         $budgetMonthDate = $selectedDate->format('Y-m-01');
         $monthlyBudget = (float) ($user->budgets()
             ->where('budget_month', $budgetMonthDate)
@@ -104,35 +102,44 @@ class DashboardController extends Controller
         $budgetRemaining = $monthlyBudget > 0 ? ($monthlyBudget - $monthlyExpense) : 0;
         $budgetProgress = $monthlyBudget > 0 ? min(100, round(($monthlyExpense / $monthlyBudget) * 100)) : 0;
 
-        // 6. Monthly Expense Trend (6-month rolling window ending with the selected month)
+        // 5. Monthly Expense Trend (6-month rolling window consolidated in 1 single query)
+        $trendStartDate = $selectedDate->copy()->subMonths(5)->startOfMonth()->toDateString();
+        $trendEndDate = $selectedDate->copy()->endOfMonth()->toDateString();
+
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $monthExpr = $isSqlite
+            ? "strftime('%Y-%m', transactions.transaction_date)"
+            : "DATE_FORMAT(transactions.transaction_date, '%Y-%m')";
+
+        $trendExpenses = DB::table('transactions')
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.user_id', $userId)
+            ->whereNull('transactions.deleted_at')
+            ->where('categories.type', 'expense')
+            ->where('transactions.transaction_date', '>=', $trendStartDate)
+            ->where('transactions.transaction_date', '<=', $trendEndDate)
+            ->selectRaw("{$monthExpr} as ym, SUM(transactions.amount) as total")
+            ->groupBy('ym')
+            ->pluck('total', 'ym')
+            ->toArray();
+
         $trendData = [];
         $maxTrendAmount = 0.0;
 
         for ($i = 5; $i >= 0; $i--) {
             $monthDate = $selectedDate->copy()->subMonths($i);
-            $year = $monthDate->year;
-            $month = $monthDate->month;
-            $monthName = $monthDate->format('M');
-            $isTargetMonth = ($i === 0);
-
-            $spent = (float) (DB::table('transactions')
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.user_id', $userId)
-                ->whereNull('transactions.deleted_at')
-                ->where('categories.type', 'expense')
-                ->whereYear('transactions.transaction_date', $year)
-                ->whereMonth('transactions.transaction_date', $month)
-                ->sum('transactions.amount') ?? 0);
+            $monthKey = $monthDate->format('Y-m');
+            $spent = (float) ($trendExpenses[$monthKey] ?? 0);
 
             if ($spent > $maxTrendAmount) {
                 $maxTrendAmount = $spent;
             }
 
             $trendData[] = [
-                'label' => $monthName,
+                'label' => $monthDate->format('M'),
                 'amount' => $spent,
-                'is_current' => $isTargetMonth,
-                'month_key' => $monthDate->format('Y-m'),
+                'is_current' => ($i === 0),
+                'month_key' => $monthKey,
             ];
         }
 
@@ -204,21 +211,6 @@ class DashboardController extends Controller
             ->latest('id')
             ->take(5)
             ->get();
-
-        // 9. All-Time totals (for background reference)
-        $allTimeIncome = (float) (DB::table('transactions')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('transactions.user_id', $userId)
-            ->whereNull('transactions.deleted_at')
-            ->where('categories.type', 'income')
-            ->sum('transactions.amount') ?? 0);
-
-        $allTimeExpense = (float) (DB::table('transactions')
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('transactions.user_id', $userId)
-            ->whereNull('transactions.deleted_at')
-            ->where('categories.type', 'expense')
-            ->sum('transactions.amount') ?? 0);
 
         return view('dashboard', [
             'selectedDate' => $selectedDate,
