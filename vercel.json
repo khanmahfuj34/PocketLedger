@@ -2,22 +2,15 @@
   "version": 2,
   "framework": null,
   "regions": ["hnd1"],
-  "builds": [
-    {
-      "src": "pocketledger/api/index.php",
-      "use": "vercel-php@0.7.3",
-      "config": {
-        "maxDuration": 10
-      }
-    },
-    {
-      "src": "pocketledger/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "public"
-      }
+  "buildCommand": "cd pocketledger && php -r \"file_exists('composer.phar') || copy('https://getcomposer.org/composer.phar', 'composer.phar');\" && php composer.phar install --no-dev --prefer-dist --optimize-autoloader --no-interaction && npm run build",
+  "outputDirectory": "pocketledger/public",
+  "functions": {
+    "pocketledger/api/index.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": "pocketledger/**"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/build/(.*)",
@@ -35,4 +28,3 @@
     }
   ]
 }
-
