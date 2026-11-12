@@ -2,22 +2,25 @@
   "version": 2,
   "framework": null,
   "regions": ["hnd1"],
-  "builds": [
-    {
-      "src": "api/index.php",
-      "use": "vercel-php@0.7.3",
-      "config": {
-        "maxDuration": 10
-      }
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "public"
-      }
+  "buildCommand": "php -r \"file_exists('composer.phar') || copy('https://getcomposer.org/composer.phar', 'composer.phar');\" && php composer.phar install --no-dev --prefer-dist --optimize-autoloader --no-interaction && npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": [
+        "app/**",
+        "bootstrap/**",
+        "config/**",
+        "database/**",
+        "public/**",
+        "resources/**",
+        "routes/**",
+        "vendor/**",
+        "certs/**"
+      ]
     }
-  ],
+  },
   "routes": [
     {
       "src": "/build/(.*)",
@@ -35,4 +38,3 @@
     }
   ]
 }
-

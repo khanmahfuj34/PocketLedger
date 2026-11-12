@@ -11,7 +11,26 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 }
 
 // Register the Composer autoloader...
-require __DIR__.'/../vendor/autoload.php';
+$autoloaderPaths = [
+    __DIR__.'/../vendor/autoload.php',
+    __DIR__.'/../../vendor/autoload.php',
+    dirname(__DIR__).'/vendor/autoload.php',
+    '/var/task/user/pocketledger/vendor/autoload.php',
+    '/var/task/user/vendor/autoload.php',
+];
+
+$autoloaderLoaded = false;
+foreach ($autoloaderPaths as $path) {
+    if (file_exists($path)) {
+        require $path;
+        $autoloaderLoaded = true;
+        break;
+    }
+}
+
+if (! $autoloaderLoaded) {
+    require __DIR__.'/../vendor/autoload.php';
+}
 
 // Bootstrap Laravel and handle the request...
 /** @var Application $app */

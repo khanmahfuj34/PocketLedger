@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "vercel-build": "php -r \"file_exists('composer.phar') || copy('https://getcomposer.org/composer.phar', 'composer.phar');\" && php composer.phar install --no-dev --prefer-dist --optimize-autoloader --no-interaction && vite build",
         "dev": "vite"
     },
     "devDependencies": {
