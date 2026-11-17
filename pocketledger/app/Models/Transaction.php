@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
+use App\Models\Scopes\ActiveCategoryScope;
 
 class Transaction extends Model
 {
@@ -36,11 +38,23 @@ class Transaction extends Model
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsTo(Category::class)->withoutGlobalScope(ActiveCategoryScope::class);
     }
 
     public function attachments(): HasMany
     {
         return $this->hasMany(Attachment::class);
+    }
+    public function scopeHighAmount(Builder $query): void
+    {
+        $query->where('amount', '>', 1000);
+    }
+    public function scopeRecent(Builder $query): void
+    {
+        $query->where(
+            'transaction_date',
+            '>=',
+            now()->subDays(30)->toDateString()
+        );
     }
 }

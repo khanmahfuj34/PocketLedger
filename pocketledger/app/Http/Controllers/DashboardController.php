@@ -7,9 +7,38 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use OpenApi\Attributes as OA;
 
 class DashboardController extends Controller
 {
+    #[OA\Get(
+        path: '/dashboard',
+        operationId: 'getDashboard',
+        summary: 'Display financial dashboard',
+        description: 'Calculates and returns monthly financial metrics including total income, total expenses, net savings, budget utilization, spending breakdown, and rolling 6-month trends.',
+        tags: ['Dashboard'],
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OA\Parameter(
+                name: 'month',
+                in: 'query',
+                required: false,
+                description: 'Filter metrics for a specific month in YYYY-MM format (defaults to current month). Cannot be in the future or prior to user registration.',
+                schema: new OA\Schema(type: 'string', example: '2026-11')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Dashboard loaded successfully with financial KPIs and charts'
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Unauthenticated session',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')
+            ),
+        ]
+    )]
     public function index(Request $request)
     {
         /** @var User $user */
